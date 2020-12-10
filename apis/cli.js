@@ -126,13 +126,15 @@ class CLI {
   list() {
     const sites = fs.readdirSync(PASS_DIR);
 
-    const passwords = sites.filter(item => item !== ".git").map((site) => {
-      const content = fs.readdirSync(path.resolve(PASS_DIR, site))
-        .map(item => `\n  — ${item}`)
-        .join("");
+    const passwords = sites
+      .filter(item => item !== ".git" && item !== ".DS_Store")
+      .map((site) => {
+        const content = fs.readdirSync(path.resolve(PASS_DIR, site))
+          .map(item => `\n  — ${item}`)
+          .join("");
 
-      return `${site}${content}`;
-    });
+        return `${site}${content}`;
+      });
 
     console.log(`\n${passwords.join("\n\n")}\n`);
   }
