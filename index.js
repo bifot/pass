@@ -1,170 +1,106 @@
 #!/usr/bin/env node
 
-const os = require("os");
-const fs = require("fs");
-const path = require("path");
-const util = require("util");
-const cp = require("child_process");
 const {program} = require("commander");
-const generate = require("./utils/generate");
+const cli = require("./apis/cli");
 
-const PASS_DIR = path.resolve(os.homedir(), ".pass");
-
-const SSH_PRIVATE = path.resolve(os.homedir(), ".ssh", "id_rsa");
-const SSH_PUBLIC = path.resolve(os.homedir(), ".ssh", "id_rsa.pub");
-const SSH_PUBLIC_PKCS8 = path.resolve(os.homedir(), ".ssh", "id_rsa.pub.pkcs8");
-
-const GIT_AVAILABLE = fs.existsSync(path.resolve(DIR, ".git"));
-
-const savePassword = async ({source, size, username, password}) => {
-  let dir = path.resolve(DIR, username);
-
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir);
-  }
-
-  dir = path.resolve(dir, source);
-
-  if (fs.existsSync(dir)) {
-    return console.error("Password is already exists.");
-  }
-
-  if (!password) {
-    password = generate(size);
-
-    console.log(`🔐 Password generated: ${password}`);
-  } else {
-    console.log("🔐 Password saved.");
-  }
-
-  cp.execSync(`
-    echo '${password}' | openssl rsautl -encrypt -pubin -inkey ~/.ssh/id_rsa.pub.pkcs8 -out ${dir}
-  `);
-
-  if (GIT_AVAILABLE) {
-    try {
-      await cp.exec(`
-          cd ${DIR} && git add ${dir} && git commit -m 'Added password for ${username}/${source}.' && git push origin master
-        `);
-
-      console.log("✍️  Successfully pushed password in Git.");
-    } catch (e) {
-      console.error("⛔️ Failed to push password in Git.");
-    }
-  }
-};
-
-cp.exec = util.promisify(cp.exec);
-
-program.version("0.0.1");
+program
+  .name("pass")
+  .version("1.0.0");
 
 program
   .command("init")
-  .description("init password store")
-  .action(() => {
-    if (!fs.existsSync(SSH_PRIVATE) || !fs.existsSync(SSH_PUBLIC)) {
-      return console.error("⛔️ Something wrong with your ssh keys. Check ~/.ssh on your computer.");
-    }
-
-    if (!fs.existsSync(SSH_PUBLIC_PKCS8)) {
-      console.log("🔧 Generating ~/.ssh/id_rsa.pub.pkcs8 from your public key...");
-
-      cp.execSync(`
-        ssh-keygen -e -f ${SSH_PUBLIC} -m PKCS8 > ${SSH_PUBLIC_PKCS8}
-      `);
-    }
-
-    if (fs.existsSync(DIR)) {
-      return console.log("✅ Password manager is already initialized.");
-    }
-
-    fs.mkdirSync(DIR);
-
-    console.log("✅ Password manager is successfully initialized.");
-  });
+  .description("init password storage")
+  .action(cli.init);
 
 program
-  .command("generate <source>")
-  .option("-u <username>", "username or email")
-  .option("-s <size>", "size")
-  .description("generate password")
-  .action(async (source, cmd) => {
-    const {u: username, s: size} = cmd;
+  .command("generate")
+  .option("-s, --site <site>", "site")
+  .option("-u, --username <username>", "username or email")
+  .option("-l, --length <length>", "password's length")
+  .description("generate password to storage")
+  .action((cmd) => {
+    const {site, username, length} = cmd;
 
-    savePassword({
+    if (!site || !username) return cmd.help();
+
+    return cli.generate({
+      site,
       username,
-      size,
-      source
+      length
     });
   });
 
 program
-  .command("show <source>")
-  .option("-u <username>", "username or email")
-  .description("show password")
-  .action((source, cmd) => {
-    const {u: username} = cmd;
-    const dir = path.resolve(DIR, username, source);
+  .command("show")
+  .option("-s, --site <site>", "site")
+  .option("-u, --username <username>", "username or email")
+  .description("show password from storage")
+  .action((cmd) => {
+    const {site, username} = cmd;
 
-    if (!fs.existsSync(dir)) {
-      return console.error("Password is not exists.");
-    }
+    if (!site || !username) return cmd.help();
 
-    const password = cp.execSync(`
-      openssl rsautl -decrypt -inkey ~/.ssh/id_rsa -in ${dir}
-    `).toString().trim();
-
-    console.log(`🔐 Your password: ${password}`);
-  });
-
-program
-  .command("add <source>")
-  .option("-u <username>", "username or email")
-  .option("-p <password>", "password")
-  .description("add password")
-  .action((source, cmd) => {
-    const {u: username, p: password} = cmd;
-
-    savePassword({
-      username,
-      password,
-      source
+    return cli.show({
+      site,
+      username
     });
   });
 
 program
-  .command("rm <source>")
-  .option("-u <username", "username or email")
-  .description("delete password")
-  .action((source, cmd) => {
-    const {u: username} = cmd;
-    const dir = path.resolve(DIR, username, source);
+  .command("add")
+  .option("-s, --site <site>", "site")
+  .option("-u, --username <username>", "username or email")
+  .option("-p, --password <password>", "password")
+  .description("add existing password to storage")
+  .action((cmd) => {
+    const {site, username, password} = cmd;
 
-    if (!fs.existsSync(dir)) {
-      return console.error("Password is not exists.");
-    }
+    if (!site || !username || !password) return cmd.help();
 
-    fs.unlinkSync(dir);
+    return cli.add({
+      site,
+      username,
+      password
+    });
+  });
+
+program
+  .command("rm")
+  .option("-s, --site <site>", "site")
+  .option("-u, --username <username>", "username or email")
+  .description("remove password from storage")
+  .action((cmd) => {
+    const {site, username} = cmd;
+
+    if (!site || !username) return cmd.help();
+
+    return cli.rm({
+      site,
+      username
+    });
+  });
+
+program
+  .command("rename")
+  .option("-s, --site <site>", "site")
+  .option("-o, --old <username>", "old username or email")
+  .option("-n, --new <username>", "new username or email")
+  .description("rename password in storage")
+  .action((cmd) => {
+    const {site, old: oldUsername, new: newUsername} = cmd;
+
+    if (!site || !oldUsername || !newUsername) return cmd.help();
+
+    return cli.rename({
+      site,
+      oldUsername,
+      newUsername
+    });
   });
 
 program
   .command("list")
-  .description("list accounts")
-  .action(() => {
-    const accounts = fs.readdirSync(DIR).filter(item => item !== ".git");
-
-    const message = accounts.map((account) => {
-      let string = account;
-      let sources = fs.readdirSync(path.resolve(DIR, account));
-
-      sources.forEach((source) => {
-        string += `\n  — ${source}`;
-      });
-
-      return string;
-    }).join("\n");
-
-    console.log(message);
-  });
+  .description("list all passwords from storage")
+  .action(cli.list);
 
 program.parse();
