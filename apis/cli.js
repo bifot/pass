@@ -126,7 +126,7 @@ class CLI {
   list() {
     const sites = fs.readdirSync(PASS_DIR);
 
-    const passwords = sites.map((site) => {
+    const passwords = sites.filter(item => item !== ".git").map((site) => {
       const content = fs.readdirSync(path.resolve(PASS_DIR, site))
         .map(item => `\n  — ${item}`)
         .join("");
