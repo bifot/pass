@@ -127,7 +127,7 @@ class CLI {
     const sites = fs.readdirSync(PASS_DIR);
 
     const passwords = sites
-      .filter(item => item !== ".git" && item !== ".DS_Store")
+      .filter(item => item !== ".git" && item !== ".gitignore" && item !== ".DS_Store")
       .map((site) => {
         const content = fs.readdirSync(path.resolve(PASS_DIR, site))
           .map(item => `\n  — ${item}`)

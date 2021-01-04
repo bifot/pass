@@ -1,6 +1,6 @@
 {
-  "name": "pass",
-  "version": "1.0.0",
+  "name": "passx",
+  "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -11,8 +11,11 @@
     "url": "git+https://github.com/bifot/pass.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Mikhail Semin",
+  "license": "MIT",
+  "bin": {
+    "pass": "./index.js"
+  },
   "bugs": {
     "url": "https://github.com/bifot/pass/issues"
   },
