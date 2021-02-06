@@ -21,6 +21,8 @@
   },
   "homepage": "https://github.com/bifot/pass#readme",
   "dependencies": {
-    "commander": "^6.2.0"
+    "commander": "^6.2.0",
+    "copy-paste": "^1.3.0",
+    "simple-encryptor": "^4.0.0"
   }
 }

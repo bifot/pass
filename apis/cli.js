@@ -1,42 +1,16 @@
 const fs = require("fs");
-const cp = require("child_process");
 const path = require("path");
-const os = require("os");
+const cp = require("child_process");
+const {promisify} = require("util");
+const {copy: _copy} = require("copy-paste");
+const Git = require("./git");
 const Password = require("./password");
 const locales = require("../locales");
-const {PASS_DIR, SSH_PRIVATE, SSH_PUBLIC, SSH_PUBLIC_PKCS8} = require("../constants");
-const { passInitializedSuccesfully } = require("../locales");
+const {PASS_DIR} = require("../constants");
+
+const copy = promisify(_copy);
 
 class CLI {
-  init() {
-    const pass = fs.existsSync(PASS_DIR);
-
-    if (pass) {
-      return console.log(locales.passAlreadyInitialized);
-    }
-
-    const privateKey = fs.existsSync(SSH_PRIVATE);
-    const publicKey = fs.existsSync(SSH_PUBLIC);
-
-    if (!privateKey || !publicKey) {
-      return console.error(locales.invalidSshKeys);
-    }
-
-    const publicPkcs8Key = fs.existsSync(SSH_PUBLIC_PKCS8);
-
-    if (!publicPkcs8Key) {
-      console.log(locales.generatingPkcs8Key);
-
-      cp.execSync(`
-        ssh-keygen -e -f ${SSH_PUBLIC} -m PKCS8 > ${SSH_PUBLIC_PKCS8}
-      `);
-    }
-
-    fs.mkdirSync(PASS_DIR);
-
-    console.log(locales.passInitializedSuccesfully);
-  }
-
   add(options) {
     const {site, username, password} = options;
 
@@ -52,6 +26,7 @@ class CLI {
     }
 
     Password.encrypt(passwordPath, password);
+    Git.save(`Added password ${site}/${username}.`);
 
     console.log(locales.passwordAdded);
   }
@@ -72,6 +47,8 @@ class CLI {
       fs.rmdirSync(sitePath);
     }
 
+    Git.save(`Removed password ${site}/${username}.`);
+
     console.log(locales.passwordRemoved);
   }
 
@@ -87,10 +64,12 @@ class CLI {
 
     fs.renameSync(oldFilepath, newFilepath);
 
+    Git.save(`Renamed password ${site}/${newUsername}.`);
+
     console.log(locales.passwordRenamed);
   }
 
-  generate(options) {
+  async generate(options) {
     const {site, username, length} = options;
 
     const sitePath = path.resolve(PASS_DIR, site);
@@ -107,11 +86,15 @@ class CLI {
     }
 
     password.encrypt(passwordPath);
+
+    Git.save(`Generated password ${site}/${username}.`);
+
+    await copy(password.password);
   
-    console.log(`${locales.passwordGenerated} ${password.password}`);
+    console.log(locales.passwordCopied);
   }
 
-  show(options) {
+  async show(options) {
     const {site, username} = options;
 
     const filepath = path.resolve(PASS_DIR, site, username);
@@ -120,11 +103,17 @@ class CLI {
       return console.error(locales.passwordNotExists);
     }
 
-    console.log(`${locales.passwordDisplayed} ${Password.decrypt(filepath)}`);
+    await copy(Password.decrypt(filepath));
+
+    console.log(locales.passwordCopied);
   }
 
   list() {
     const sites = fs.readdirSync(PASS_DIR);
+
+    if (!sites.length) {
+      return console.log(locales.storeIsEmpty);
+    }
 
     const passwords = sites
       .filter(item => item !== ".git" && item !== ".gitignore" && item !== ".DS_Store")
@@ -137,6 +126,14 @@ class CLI {
       });
 
     console.log(`\n${passwords.join("\n\n")}\n`);
+  }
+
+  git({url}) {
+    if (!fs.existsSync(path.resolve(PASS_DIR, ".git"))) {
+      cp.execSync(`cd ${PASS_DIR} && git init && git remote add origin ${url}`);
+    }
+
+    console.log(locales.gitRepositoryInitialized);
   }
 }
 

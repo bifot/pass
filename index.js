@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 
+const fs = require("fs");
 const {program} = require("commander");
+const {PASS_DIR} = require("./constants");
 const cli = require("./apis/cli");
+
+if (!fs.existsSync(PASS_DIR)) {
+  fs.mkdirSync(PASS_DIR);
+}
 
 program
   .name("pass")
   .version("1.0.0");
-
-program
-  .command("init")
-  .description("init password storage")
-  .action(cli.init);
 
 program
   .command("generate")
@@ -102,5 +103,18 @@ program
   .command("list")
   .description("list all passwords from storage")
   .action(cli.list);
+
+program
+  .command("git")
+  .option("-u, --url <url>", "repository url")
+  .action((cmd) => {
+    const {url} = cmd;
+
+    if (!url) return cmd.help();
+
+    return cli.git({
+      url
+    });
+  });
 
 program.parse();

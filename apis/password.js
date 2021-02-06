@@ -1,5 +1,9 @@
-const cp = require("child_process");
-const {SSH_PRIVATE, SSH_PUBLIC_PKCS8} = require("../constants");
+const fs = require("fs");
+const encryptor = require("simple-encryptor");
+const {SSH_PRIVATE} = require("../constants");
+
+const key = fs.readFileSync(SSH_PRIVATE, "utf8").trim();
+const {encrypt, decrypt} = encryptor(key);
 
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -29,15 +33,11 @@ class Password {
   }
 
   static encrypt(filepath, password) {
-    return cp.execSync(`
-      echo '${password}' | openssl rsautl -encrypt -pubin -inkey ${SSH_PUBLIC_PKCS8} -out ${filepath}
-    `).toString();
+    fs.writeFileSync(filepath, encrypt(password));
   }
 
   static decrypt(filepath) {
-    return cp.execSync(`
-      openssl rsautl -decrypt -inkey ${SSH_PRIVATE} -in ${filepath}
-    `).toString().trim();
+    return decrypt(fs.readFileSync(filepath, "utf8"));
   }
 }
 
