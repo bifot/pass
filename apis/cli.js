@@ -3,6 +3,7 @@ const path = require("path");
 const cp = require("child_process");
 const {promisify} = require("util");
 const {copy: _copy} = require("copy-paste");
+const Table = require("cli-table");
 const Git = require("./git");
 const Password = require("./password");
 const locales = require("../locales");
@@ -95,7 +96,11 @@ class CLI {
   }
 
   async show(options) {
-    const {site, username} = options;
+    let {site, username} = options;
+
+    if (!username) {
+      username = fs.readdirSync(path.resolve(PASS_DIR, site))[0];
+    }
 
     const filepath = path.resolve(PASS_DIR, site, username);
 
@@ -115,17 +120,35 @@ class CLI {
       return console.log(locales.storeIsEmpty);
     }
 
-    const passwords = sites
-      .filter(item => item !== ".git" && item !== ".gitignore" && item !== ".DS_Store")
-      .map((site) => {
-        const content = fs.readdirSync(path.resolve(PASS_DIR, site))
-          .map(item => `\n  — ${item}`)
-          .join("");
+    const table = new Table({
+      head: ["Site", "Username"]
+    });
 
-        return `${site}${content}`;
+    const data = [];
+
+    sites.forEach((site) => {
+      if ([".git", ".gitignore", ".DS_Store"].includes(site)) return;
+
+      const usernames = fs.readdirSync(path.resolve(PASS_DIR, site));
+
+      usernames.forEach((username) => {
+        data.push([
+          site,
+          username
+        ]);
       });
+    });
 
-    console.log(`\n${passwords.join("\n\n")}\n`);
+    data.sort((a, b) => {
+      if (a[1] > b[1]) return 1;
+      if (a[1] < b[1]) return -1;
+
+      return 0;
+    });
+
+    table.push(...data);
+
+    console.log(table.toString());
   }
 
   git({url}) {

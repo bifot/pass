@@ -31,21 +31,27 @@ program
     });
   });
 
-program
-  .command("show")
-  .option("-s, --site <site>", "site")
-  .option("-u, --username <username>", "username or email")
-  .description("show password from storage")
-  .action((cmd) => {
-    const {site, username} = cmd;
+["show", "copy"].forEach((name) => {
+  program
+    .command(name)
+    .option("-s, --site <site>", "site")
+    .option("-u, --username <username>", "username or email")
+    .description(`${name} password from storage`)
+    .action((cmd) => {
+      let {site, username} = cmd;
 
-    if (!site || !username) return cmd.help();
+      if (cmd.args.length === 1) {
+        site = cmd.args[0];
+      }
 
-    return cli.show({
-      site,
-      username
+      if (!site) return cmd.help();
+
+      return cli.show({
+        site,
+        username
+      });
     });
-  });
+});
 
 program
   .command("add")
